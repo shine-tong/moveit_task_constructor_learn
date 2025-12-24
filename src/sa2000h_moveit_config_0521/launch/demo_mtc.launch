@@ -8,6 +8,6 @@
 
   <!-- Run rviz with prepared config -->
   <include file="$(find sa2000h_moveit_config_0521)/launch/moveit_rviz.launch">
-    <arg name="rviz_config" value="$(find moveit_task_constructor_demo)/config/mtc.rviz" />
+    <arg name="rviz_config" value="$(find sa2000h_moveit_config_0521)/config/mtc_rviz.rviz" />
   </include>
 </launch>
