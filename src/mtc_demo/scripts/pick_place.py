@@ -1,5 +1,12 @@
 #! /usr/bin/env python3
 # -*- coding: utf-8 -*-
+
+import os, sys
+# 设置模块路径（在其他 import 之前）
+workspace_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
+sys.path.insert(0, os.path.join(workspace_root, 'devel/lib/python3/dist-packages'))
+sys.path.insert(0, os.path.join(workspace_root, 'src/moveit_task_constructor/core/python/src'))
+
 import time
 import math
 import rospy
@@ -35,23 +42,22 @@ def pick_and_place():
     crea_object(object_name, object_size)
     
     task = core.Task()
-    task.name = "pick_and_place"
-    
+    task.name = "pick_and_place"   
     task.add(stages.CurrentState("current_state"))
     
-    # 创建规划器
-    piperline = core.PipelinePlanner()
-    piperline.planner = "RRTConnectkConfigDefault"
-    piperline.num_planning_attempts = 3
-    piperline.goal_position_tolerance = 0.01
-    piperline.goal_orientation_tolerance = 0.01
-    piperline.goal_joint_tolerance = 0.01
-    piperline.max_velocity_scaling_factor = 1.0
-    piperline.max_acceleration_scaling_factor = 1.0
-    planners = [(arm, piperline)]
+    pipeline = core.PipelinePlanner()
+    pipeline.planner = "RRTConnectkConfigDefault"
+    pipeline.num_planning_attempts = 5  
+    pipeline.goal_position_tolerance = 0.05 
+    pipeline.goal_orientation_tolerance = 0.05 
+    # pipeline.goal_joint_tolerance = 0.05  
+    pipeline.max_velocity_scaling_factor = 0.5  
+    pipeline.max_acceleration_scaling_factor = 0.5
+    planners = [(arm, pipeline)]
     
-    # 连接到指定的规划组和规划器
-    task.add(stages.Connect("connect", planners))
+    # 连接当前状态到抓取姿态
+    connect1 = stages.Connect("connect_to_pick", planners)
+    task.add(connect1)
     
     # 创建抓握生成器
     grasp_generator = stages.GenerateGraspPose("Generate Grasp Pose")
@@ -92,7 +98,7 @@ def pick_and_place():
     oc = OrientationConstraint()
     oc.parameterization = OrientationConstraint.ROTATION_VECTOR
     oc.header.frame_id = "world"
-    oc.link_name = "panda_hand"
+    oc.link_name = "object"
     oc.orientation.w = 1.0
     oc.absolute_x_axis_tolerance = 0.5
     oc.absolute_y_axis_tolerance = 0.5
@@ -100,13 +106,13 @@ def pick_and_place():
     oc.weight = 1.0  # 硬约束
     
     constraint = Constraints()
-    constraint.name = "panda_hand:upright"
+    constraint.name = "object:upright"
     constraint.orientation_constraints.append(oc)
     
     # 将 Pick 阶段与以下 Place 阶段连接
-    con = stages.Connect("connect", planners)
-    # con.properties["path_constraints"] = constraint
-    task.add(con)
+    connect2 = stages.Connect("connect_to_place", planners)
+    connect2.path_constraints = constraint  
+    task.add(connect2)
     
     # 定义物体放置后的姿态
     place_pose = PoseStamped()
@@ -152,12 +158,20 @@ def pick_and_place():
     
     if task.plan():
         solutions = task.solutions
-        task.publish(task.solutions[0])
-        task.execute(task.solutions[0])
-        trajj = convert_msgs.Sol_to_JointTrajMsg(solutions)
+        if solutions:
+            rospy.loginfo(f"Found {len(solutions)} solution(s)")
+            task.publish(solutions[0])
+            task.execute(solutions[0])
+            trajj = convert_msgs.Sol_to_JointTrajMsg(solutions)
+        else:
+            rospy.logwarn("Planning succeeded but no solutions found")
+    else:
+        rospy.logerr("Task planning failed!")
+        # 打印失败信息以便调试
+        task.enableIntrospection()
     
     # 避免 ClassLoader 警告    
-    del piperline
+    del pipeline
     del planners
     
     time.sleep(50)

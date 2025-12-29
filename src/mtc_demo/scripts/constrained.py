@@ -1,6 +1,12 @@
 #! /usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import os, sys
+# 设置模块路径（在其他 import 之前）
+workspace_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
+sys.path.insert(0, os.path.join(workspace_root, 'devel/lib/python3/dist-packages'))
+sys.path.insert(0, os.path.join(workspace_root, 'src/moveit_task_constructor/core/python/src'))
+
 import time
 import rospy
 from std_msgs.msg import Header
