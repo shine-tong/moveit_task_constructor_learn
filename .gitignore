@@ -320,3 +320,4 @@ _Pvt_Extensions
 *.env
 *.catkin_workspace
 *.zip
+.catkin_tools/
